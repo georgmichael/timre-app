@@ -32,6 +32,9 @@ yarn-error.*
 
 # local env files
 .env*.local
+.env
+.env.production
+.env.development
 
 # typescript
 *.tsbuildinfo
@@ -39,3 +42,41 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# EAS (Expo Application Services)
+.easignore
+eas-credentials.json
+
+# Sensitive data - DO NOT COMMIT
+*.pem
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.jks
+*.keystore
+google-services.json
+GoogleService-Info.plist
+
+# Apple certificates
+ios/certs/
+*.certSigningRequest
+*.cer
+*.p12
+
+# Android signing
+android/app/*.jks
+android/app/*.keystore
+android/key.properties
+
+# API keys and secrets
+secrets.json
+config/secrets.*
+.secrets
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
