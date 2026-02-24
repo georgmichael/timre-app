@@ -1,0 +1,342 @@
+import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { RecurringGoal, Intention, AppGoal, CompleteDayResult } from '../types';
+import { STORAGE_KEYS } from '../constants/storage';
+import { MAX_STREAK_SAVERS, DAY_BOUNDARY_HOUR } from '../constants/limits';
+import { DEFAULT_BEDTIME } from '../constants/defaults';
+
+const DEFAULT_RECURRING_GOALS: RecurringGoal[] = [
+  { id: 1, type: 'app', name: 'Instagram', limit: 30, used: 0, color: '#e4405f', completed: false },
+  { id: 2, type: 'app', name: 'TikTok', limit: 45, used: 0, color: '#00f2ea', completed: false },
+  { id: 3, type: 'habit', name: 'Meditate 10 min', completed: false },
+];
+
+interface AppContextValue {
+  isLoading: boolean;
+  bedtime: string;
+  setBedtime: (value: string) => Promise<void>;
+  userEmail: string;
+  setUserEmail: (value: string) => Promise<void>;
+  use24HourFormat: boolean;
+  setUse24HourFormat: (value: boolean) => Promise<void>;
+  currentStreak: number;
+  longestStreak: number;
+  streakSavers: number;
+  dayStarted: boolean;
+  setDayStarted: (value: boolean) => Promise<void>;
+  recurringGoals: RecurringGoal[];
+  addRecurringGoal: (goal: Omit<RecurringGoal, 'id'>) => Promise<void>;
+  deleteRecurringGoal: (id: number | string) => Promise<void>;
+  updateRecurringGoal: (id: number | string, updates: Partial<AppGoal> | Partial<RecurringGoal>) => Promise<void>;
+  dailyIntentions: Intention[];
+  addDailyIntention: (text: string) => Promise<void>;
+  deleteDailyIntention: (id: number) => Promise<void>;
+  toggleDailyIntention: (id: number) => Promise<void>;
+  isNewDay: () => boolean;
+  startNewDay: () => Promise<void>;
+  completeDay: (useSaver?: boolean) => Promise<CompleteDayResult>;
+  getTimeSaved: () => number;
+  isEveningReviewTime: () => boolean;
+  calculateStreakSaversEarned: () => number;
+  resetAllData: () => Promise<void>;
+}
+
+const AppContext = createContext<AppContextValue | undefined>(undefined);
+
+export const useApp = (): AppContextValue => {
+  const context = useContext(AppContext);
+  if (!context) {
+    throw new Error('useApp must be used within AppProvider');
+  }
+  return context;
+};
+
+export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [isLoading, setIsLoading] = useState(true);
+
+  const [bedtime, setBedtimeState] = useState(DEFAULT_BEDTIME);
+  const [userEmail, setUserEmailState] = useState('');
+  const [use24HourFormat, setUse24HourFormatState] = useState(false);
+
+  const [currentStreak, setCurrentStreakState] = useState(0);
+  const [longestStreak, setLongestStreakState] = useState(0);
+  const [streakSavers, setStreakSaversState] = useState(0);
+  const [lastOpenedDate, setLastOpenedDateState] = useState(new Date().toDateString());
+  const [dayStarted, setDayStartedState] = useState(false);
+
+  const [recurringGoals, setRecurringGoalsState] = useState<RecurringGoal[]>(DEFAULT_RECURRING_GOALS);
+  const [dailyIntentions, setDailyIntentionsState] = useState<Intention[]>([]);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      const [
+        savedBedtime,
+        savedEmail,
+        savedCurrentStreak,
+        savedLongestStreak,
+        savedStreakSavers,
+        savedLastOpenedDate,
+        savedDayStarted,
+        savedRecurringGoals,
+        savedDailyIntentions,
+        savedUse24HourFormat,
+      ] = await Promise.all([
+        AsyncStorage.getItem(STORAGE_KEYS.BEDTIME),
+        AsyncStorage.getItem(STORAGE_KEYS.USER_EMAIL),
+        AsyncStorage.getItem(STORAGE_KEYS.CURRENT_STREAK),
+        AsyncStorage.getItem(STORAGE_KEYS.LONGEST_STREAK),
+        AsyncStorage.getItem(STORAGE_KEYS.STREAK_SAVERS),
+        AsyncStorage.getItem(STORAGE_KEYS.LAST_OPENED_DATE),
+        AsyncStorage.getItem(STORAGE_KEYS.DAY_STARTED),
+        AsyncStorage.getItem(STORAGE_KEYS.RECURRING_GOALS),
+        AsyncStorage.getItem(STORAGE_KEYS.DAILY_INTENTIONS),
+        AsyncStorage.getItem(STORAGE_KEYS.USE_24_HOUR_FORMAT),
+      ]);
+
+      if (savedBedtime) setBedtimeState(savedBedtime);
+      if (savedEmail) setUserEmailState(savedEmail);
+      if (savedCurrentStreak) setCurrentStreakState(parseInt(savedCurrentStreak, 10));
+      if (savedLongestStreak) setLongestStreakState(parseInt(savedLongestStreak, 10));
+      if (savedStreakSavers) setStreakSaversState(parseInt(savedStreakSavers, 10));
+      if (savedLastOpenedDate) setLastOpenedDateState(savedLastOpenedDate);
+      if (savedDayStarted) setDayStartedState(savedDayStarted === 'true');
+      if (savedRecurringGoals) setRecurringGoalsState(JSON.parse(savedRecurringGoals));
+      if (savedDailyIntentions) setDailyIntentionsState(JSON.parse(savedDailyIntentions));
+      if (savedUse24HourFormat !== null) setUse24HourFormatState(savedUse24HourFormat === 'true');
+    } catch (error) {
+      console.error('Error loading data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const setBedtime = useCallback(async (value: string) => {
+    setBedtimeState(value);
+    await AsyncStorage.setItem(STORAGE_KEYS.BEDTIME, value);
+  }, []);
+
+  const setUserEmail = useCallback(async (value: string) => {
+    setUserEmailState(value);
+    await AsyncStorage.setItem(STORAGE_KEYS.USER_EMAIL, value);
+  }, []);
+
+  const setUse24HourFormat = useCallback(async (value: boolean) => {
+    setUse24HourFormatState(value);
+    await AsyncStorage.setItem(STORAGE_KEYS.USE_24_HOUR_FORMAT, value.toString());
+  }, []);
+
+  const setCurrentStreak = useCallback(async (value: number) => {
+    setCurrentStreakState(value);
+    await AsyncStorage.setItem(STORAGE_KEYS.CURRENT_STREAK, value.toString());
+  }, []);
+
+  const setLongestStreak = useCallback(async (value: number) => {
+    setLongestStreakState(value);
+    await AsyncStorage.setItem(STORAGE_KEYS.LONGEST_STREAK, value.toString());
+  }, []);
+
+  const setStreakSavers = useCallback(async (value: number) => {
+    setStreakSaversState(value);
+    await AsyncStorage.setItem(STORAGE_KEYS.STREAK_SAVERS, value.toString());
+  }, []);
+
+  const setLastOpenedDate = useCallback(async (value: string) => {
+    setLastOpenedDateState(value);
+    await AsyncStorage.setItem(STORAGE_KEYS.LAST_OPENED_DATE, value);
+  }, []);
+
+  const setDayStarted = useCallback(async (value: boolean) => {
+    setDayStartedState(value);
+    await AsyncStorage.setItem(STORAGE_KEYS.DAY_STARTED, value.toString());
+  }, []);
+
+  const setRecurringGoals = useCallback(async (goals: RecurringGoal[]) => {
+    setRecurringGoalsState(goals);
+    await AsyncStorage.setItem(STORAGE_KEYS.RECURRING_GOALS, JSON.stringify(goals));
+  }, []);
+
+  const setDailyIntentions = useCallback(async (intentions: Intention[]) => {
+    setDailyIntentionsState(intentions);
+    await AsyncStorage.setItem(STORAGE_KEYS.DAILY_INTENTIONS, JSON.stringify(intentions));
+  }, []);
+
+  const isNewDay = useCallback(() => {
+    const now = new Date();
+    const today = now.toDateString();
+    const currentHour = now.getHours();
+
+    if (currentHour < DAY_BOUNDARY_HOUR) {
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      return lastOpenedDate !== yesterday.toDateString();
+    }
+
+    return lastOpenedDate !== today;
+  }, [lastOpenedDate]);
+
+  const startNewDay = useCallback(async () => {
+    const resetGoals = recurringGoals.map(goal => ({
+      ...goal,
+      completed: false,
+      ...(goal.type === 'app' && { used: 0 }),
+    }));
+    await setRecurringGoals(resetGoals);
+    await setDailyIntentions([]);
+
+    const now = new Date();
+    const currentHour = now.getHours();
+    if (currentHour >= DAY_BOUNDARY_HOUR) {
+      await setLastOpenedDate(now.toDateString());
+    } else {
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      await setLastOpenedDate(yesterday.toDateString());
+    }
+
+    await setDayStarted(false);
+  }, [recurringGoals, setRecurringGoals, setDailyIntentions, setLastOpenedDate, setDayStarted]);
+
+  const addRecurringGoal = useCallback(async (goal: Omit<RecurringGoal, 'id'>) => {
+    const newGoals = [...recurringGoals, { ...goal, id: Date.now() } as RecurringGoal];
+    await setRecurringGoals(newGoals);
+  }, [recurringGoals, setRecurringGoals]);
+
+  const deleteRecurringGoal = useCallback(async (id: number | string) => {
+    const newGoals = recurringGoals.filter(g => g.id !== id);
+    await setRecurringGoals(newGoals);
+  }, [recurringGoals, setRecurringGoals]);
+
+  const updateRecurringGoal = useCallback(async (
+    id: number | string,
+    updates: Partial<AppGoal> | Partial<RecurringGoal>,
+  ) => {
+    const newGoals = recurringGoals.map(g =>
+      g.id === id ? { ...g, ...updates } as RecurringGoal : g,
+    );
+    await setRecurringGoals(newGoals);
+  }, [recurringGoals, setRecurringGoals]);
+
+  const addDailyIntention = useCallback(async (text: string) => {
+    const newIntention: Intention = {
+      id: Date.now(),
+      text: text.trim(),
+      completed: false,
+    };
+    const newIntentions = [...dailyIntentions, newIntention];
+    await setDailyIntentions(newIntentions);
+  }, [dailyIntentions, setDailyIntentions]);
+
+  const deleteDailyIntention = useCallback(async (id: number) => {
+    const newIntentions = dailyIntentions.filter(i => i.id !== id);
+    await setDailyIntentions(newIntentions);
+  }, [dailyIntentions, setDailyIntentions]);
+
+  const toggleDailyIntention = useCallback(async (id: number) => {
+    const newIntentions = dailyIntentions.map(i =>
+      i.id === id ? { ...i, completed: !i.completed } : i,
+    );
+    await setDailyIntentions(newIntentions);
+  }, [dailyIntentions, setDailyIntentions]);
+
+  const calculateStreakSaversEarned = useCallback(() => {
+    const completedCount = dailyIntentions.filter(i => i.completed).length;
+    if (completedCount === 0) return 0;
+    if (completedCount <= 2) return 1;
+    return 2;
+  }, [dailyIntentions]);
+
+  const completeDay = useCallback(async (useSaver = false): Promise<CompleteDayResult> => {
+    const allRecurringComplete = recurringGoals.every(g => g.completed);
+    const saversEarned = calculateStreakSaversEarned();
+
+    const newSaverCount = Math.min(streakSavers + saversEarned, MAX_STREAK_SAVERS);
+    await setStreakSavers(newSaverCount);
+
+    if (allRecurringComplete) {
+      const newStreak = currentStreak + 1;
+      await setCurrentStreak(newStreak);
+      if (newStreak > longestStreak) {
+        await setLongestStreak(newStreak);
+      }
+      return { success: true, message: 'streak_maintained', saversEarned, newSaverCount };
+    } else if (useSaver && streakSavers > 0) {
+      await setStreakSavers(streakSavers - 1);
+      return { success: true, message: 'saver_used', saversEarned: 0, newSaverCount: streakSavers - 1 };
+    } else {
+      await setCurrentStreak(0);
+      return { success: false, message: 'streak_broken', saversEarned: 0, newSaverCount };
+    }
+  }, [recurringGoals, streakSavers, currentStreak, longestStreak, calculateStreakSaversEarned, setStreakSavers, setCurrentStreak, setLongestStreak]);
+
+  const getTimeSaved = useCallback(() => {
+    return recurringGoals
+      .filter((g): g is AppGoal => g.type === 'app')
+      .reduce((total, goal) => total + Math.max(0, goal.limit - goal.used), 0);
+  }, [recurringGoals]);
+
+  const isEveningReviewTime = useCallback(() => {
+    const now = new Date();
+    const [hours, minutes] = bedtime.split(':');
+    const bedtimeDate = new Date();
+    bedtimeDate.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0);
+
+    const reviewTime = new Date(bedtimeDate);
+    reviewTime.setHours(reviewTime.getHours() - 1);
+
+    return now >= reviewTime;
+  }, [bedtime]);
+
+  const resetAllData = useCallback(async () => {
+    await AsyncStorage.multiRemove(Object.values(STORAGE_KEYS));
+    setBedtimeState(DEFAULT_BEDTIME);
+    setUserEmailState('');
+    setUse24HourFormatState(false);
+    setCurrentStreakState(0);
+    setLongestStreakState(0);
+    setStreakSaversState(0);
+    setLastOpenedDateState(new Date().toDateString());
+    setDayStartedState(false);
+    setRecurringGoalsState(DEFAULT_RECURRING_GOALS);
+    setDailyIntentionsState([]);
+  }, []);
+
+  const value: AppContextValue = {
+    isLoading,
+    bedtime,
+    setBedtime,
+    userEmail,
+    setUserEmail,
+    use24HourFormat,
+    setUse24HourFormat,
+    currentStreak,
+    longestStreak,
+    streakSavers,
+    dayStarted,
+    setDayStarted,
+    recurringGoals,
+    addRecurringGoal,
+    deleteRecurringGoal,
+    updateRecurringGoal,
+    dailyIntentions,
+    addDailyIntention,
+    deleteDailyIntention,
+    toggleDailyIntention,
+    isNewDay,
+    startNewDay,
+    completeDay,
+    getTimeSaved,
+    isEveningReviewTime,
+    calculateStreakSaversEarned,
+    resetAllData,
+  };
+
+  return (
+    <AppContext.Provider value={value}>
+      {children}
+    </AppContext.Provider>
+  );
+};
