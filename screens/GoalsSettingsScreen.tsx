@@ -17,7 +17,7 @@ import {
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
 import { ThemeColors, GOAL_COLOR_PALETTE } from '../constants/colors';
-import { DEFAULT_TIME_LIMIT_MINUTES } from '../constants/limits';
+import { DEFAULT_TIME_LIMIT_MINUTES, MAX_GOAL_NAME_LENGTH, MAX_TIME_MINUTES } from '../constants/limits';
 import { RecurringGoal, AppGoal } from '../types';
 import { GoalsSettingsScreenProps } from '../types/navigation';
 
@@ -43,18 +43,19 @@ export default function GoalsSettingsScreen({ navigation: _navigation }: GoalsSe
   const [editColor, setEditColor] = useState<string>(GOAL_COLOR_PALETTE[0]);
 
   const addGoal = () => {
-    if (!goalName.trim()) {
+    const trimmedName = goalName.trim().slice(0, MAX_GOAL_NAME_LENGTH);
+    if (!trimmedName) {
       Alert.alert('Missing Name', 'Please enter a name for your goal');
       return;
     }
 
     const newGoal = {
       type: goalType,
-      name: goalName.trim(),
+      name: trimmedName,
       completed: false,
       color: goalColor,
       ...(goalType === 'app' && {
-        limit: parseInt(goalLimit, 10) || DEFAULT_TIME_LIMIT_MINUTES,
+        limit: Math.min(parseInt(goalLimit, 10) || DEFAULT_TIME_LIMIT_MINUTES, MAX_TIME_MINUTES),
         used: 0,
       }),
     } as Omit<RecurringGoal, 'id'>;
@@ -83,19 +84,20 @@ export default function GoalsSettingsScreen({ navigation: _navigation }: GoalsSe
   };
 
   const saveEdit = async () => {
-    if (!editingGoal || !editName.trim()) {
+    const trimmedName = editName.trim().slice(0, MAX_GOAL_NAME_LENGTH);
+    if (!editingGoal || !trimmedName) {
       Alert.alert('Missing Name', 'Please enter a name for your goal');
       return;
     }
 
     const updates: Partial<AppGoal> | Partial<RecurringGoal> = {
-      name: editName.trim(),
+      name: trimmedName,
       color: editColor,
     };
 
     if (editingGoal.type === 'app') {
       (updates as Partial<AppGoal>).limit =
-        parseInt(editLimit, 10) || DEFAULT_TIME_LIMIT_MINUTES;
+        Math.min(parseInt(editLimit, 10) || DEFAULT_TIME_LIMIT_MINUTES, MAX_TIME_MINUTES);
     }
 
     await updateRecurringGoal(editingGoal.id, updates);

@@ -20,7 +20,7 @@ This document confirms that the repository is safe to push to GitHub.
 
 ### 3. Credentials Management
 - [x] EAS will handle Apple credentials interactively (not in repo)
-- [x] Bundle identifier is a placeholder (needs to be changed by user)
+- [x] Bundle identifier set to `com.michaelgeorge.timre`
 - [x] No email addresses or personal info hardcoded
 
 ### 4. Files Ignored by Git
@@ -33,9 +33,17 @@ The following sensitive file types are protected in `.gitignore`:
 - EAS credentials
 - IDE configuration files
 
-### 5. Public Information Only
+### 5. Input Validation & Production Hygiene
+- [x] Goal names capped at 50 characters (`MAX_GOAL_NAME_LENGTH`)
+- [x] Daily intentions capped at 200 characters (`MAX_INTENTION_LENGTH`)
+- [x] Time inputs capped at 1440 minutes (`MAX_TIME_MINUTES`)
+- [x] Email field validated with regex before persisting
+- [x] `console.error` removed from `AppContext.tsx` load path
+- [x] `console.log` removed from `notifications.ts`
+
+### 6. Public Information Only
 Files safe to commit:
-- ✅ Source code (`.js` files)
+- ✅ Source code (`.tsx` / `.ts` files)
 - ✅ Configuration (`app.json`, `eas.json`, `package.json`)
 - ✅ Documentation (`.md` files)
 - ✅ Assets (images, icons)
@@ -50,7 +58,7 @@ Before pushing to GitHub:
 - [x] README.md is complete
 - [x] LICENSE file added
 - [x] Deployment guides included
-- [ ] Update bundle identifier in `app.json` (if not already done)
+- [x] Bundle identifier updated to `com.michaelgeorge.timre` in `app.json`
 - [ ] Review git status one more time
 - [ ] Create GitHub repository
 - [ ] Push to GitHub
@@ -75,7 +83,7 @@ This repository has been reviewed and is **SAFE TO PUSH** to GitHub.
 
 ## 📝 Notes
 
-1. **Bundle Identifier**: The `app.json` contains a placeholder bundle identifier (`com.yourname.timreapp`). This is intentional and safe - users should change it to their own.
+1. **Bundle Identifier**: Set to `com.michaelgeorge.timre` in `app.json`.
 
 2. **EAS Credentials**: When you run `eas build`, credentials are managed by Expo's servers and never stored in your repository.
 
@@ -89,7 +97,7 @@ You can verify no sensitive data exists by running:
 
 ```bash
 # Check for common sensitive patterns
-git grep -i "password\|secret\|api.key\|token" -- '*.js' '*.json'
+git grep -i "password\|secret\|api.key\|token" -- '*.ts' '*.tsx' '*.json'
 
 # List all files that will be committed
 git status
@@ -100,5 +108,5 @@ git status --ignored
 
 ---
 
-**Last Security Review**: 2026-02-15
+**Last Security Review**: 2026-02-24
 **Status**: ✅ APPROVED FOR PUBLIC REPOSITORY

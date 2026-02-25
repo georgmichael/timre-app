@@ -14,7 +14,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.yourname.timreapp",
+      "bundleIdentifier": "com.michaelgeorge.timre",
       "buildNumber": "1"
     },
     "android": {

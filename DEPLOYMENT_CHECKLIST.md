@@ -17,11 +17,9 @@ Use this checklist for your first deployment to TestFlight.
 
 ## Configuration Steps
 
-- [ ] **Update Bundle Identifier**
-  - Open `app.json`
-  - Change `"bundleIdentifier": "com.yourname.timreapp"`
-  - To: `"bundleIdentifier": "com.YOURNAME.timreapp"` (use your name)
-  - Must be unique and lowercase
+- [x] **Bundle Identifier Set**
+  - `app.json` already contains `"bundleIdentifier": "com.michaelgeorge.timre"`
+  - Change this if you are deploying under a different developer account
 
 - [ ] **Update App Name (Optional)**
   - In `app.json`, change `"name": "timre-app"` to your preferred name

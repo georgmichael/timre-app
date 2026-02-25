@@ -174,8 +174,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           await AsyncStorage.setItem(STORAGE_KEYS.COMPLETION_HISTORY, JSON.stringify(synthetic));
         }
       }
-    } catch (error) {
-      console.error('Error loading data:', error);
+    } catch {
+      // Silently handle load error — app will use default state
     } finally {
       setIsLoading(false);
     }

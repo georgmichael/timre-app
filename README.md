@@ -15,6 +15,7 @@ A React Native mobile app built with Expo to help you stay focused and build bet
 - **🌙 Evening Review** - Reflect on your day and maintain your streak
 - **⏰ Smart Notifications** - Get reminded at the right times
 - **📊 Time Saved Tracking** - See how much time you've saved by staying within limits
+- **🎨 Light / Dark / System Theme** - Appearance follows your device or your preference
 
 ## 🚀 Getting Started
 
@@ -72,39 +73,58 @@ See [DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md) for full instructions.
 
 ```
 timre-app/
-├── screens/              # App screens
-│   ├── HomeScreen.js
-│   ├── MorningCheckInScreen.js
-│   ├── EveningReviewScreen.js
-│   ├── GoalsSettingsScreen.js
-│   └── SettingsScreen.js
+├── screens/              # App screens (TypeScript)
+│   ├── HomeScreen.tsx
+│   ├── MorningCheckInScreen.tsx
+│   ├── EveningReviewScreen.tsx
+│   ├── GoalsSettingsScreen.tsx
+│   └── SettingsScreen.tsx
 ├── components/           # Reusable components
-│   └── CircularProgress.js
-├── context/             # React Context for state management
-│   └── AppContext.js
-├── utils/               # Utility functions
-│   └── notifications.js
-├── assets/              # Images, icons, fonts
-├── App.js               # Main app component
-└── app.json             # Expo configuration
+│   ├── CircularProgress.tsx
+│   └── Toggle.tsx
+├── context/              # React Context for state management
+│   ├── AppContext.tsx     # Goals, streaks, intentions, persistence
+│   └── ThemeContext.tsx   # Light/dark/system theme
+├── constants/            # App-wide constants
+│   ├── colors.ts         # Theme palettes, goal color palette
+│   ├── defaults.ts       # Default bedtime, morning hour
+│   ├── limits.ts         # MAX_STREAK_SAVERS, MAX_INTENTIONS, input limits
+│   ├── storage.ts        # AsyncStorage key names
+│   └── strings.ts        # Motivational quotes
+├── types/                # TypeScript types and navigation types
+│   ├── index.ts
+│   └── navigation.ts
+├── utils/                # Utility functions
+│   └── notifications.ts
+├── assets/               # Images, icons, fonts
+├── App.tsx               # Main app component
+└── app.json              # Expo configuration
 ```
 
 ## 🛠️ Built With
 
 - **[React Native](https://reactnative.dev/)** - Mobile framework
 - **[Expo](https://expo.dev/)** - Development platform
+- **[TypeScript](https://www.typescriptlang.org/)** - Type-safe JavaScript
 - **[React Navigation](https://reactnavigation.org/)** - Navigation library
 - **[AsyncStorage](https://react-native-async-storage.github.io/async-storage/)** - Local data persistence
 - **[Expo Notifications](https://docs.expo.dev/versions/latest/sdk/notifications/)** - Push notifications
 
+## 🔒 Security
+
+All data is stored locally — there is no backend, no accounts, and no network calls. Security measures in place:
+
+- **Input validation**: goal names capped at 50 chars, intentions at 200 chars, time entries at 1440 min (24 h)
+- **Email validation**: regex check before persisting the email field
+- **No debug logging**: `console.log/error` removed from production paths
+- **OS sandbox**: AsyncStorage on iOS lives inside the app sandbox, protected by device encryption
+
 ## 🎨 Key Components
 
 ### State Management
-The app uses React Context (`AppContext.js`) for global state management, handling:
-- Streak tracking
-- Daily intentions
-- Recurring goals
-- User settings
+The app uses React Context for global state management:
+- **`AppContext.tsx`** — streaks, goals, intentions, persistence, business logic
+- **`ThemeContext.tsx`** — light / dark / system theme, persisted preference
 
 ### Screens
 - **Home Screen** - Dashboard with streak counter, time saved, and daily overview

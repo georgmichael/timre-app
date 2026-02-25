@@ -17,7 +17,6 @@ Notifications.setNotificationHandler({
 // Request permission for notifications
 export async function requestNotificationPermissions(): Promise<boolean> {
   if (!Device.isDevice) {
-    console.log('Notifications only work on physical devices');
     return false;
   }
 

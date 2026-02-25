@@ -170,8 +170,15 @@ export default function SettingsScreen({ navigation: _navigation }: SettingsScre
     }
   };
 
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
   const saveEmail = () => {
-    setUserEmail(emailInput.trim());
+    const trimmed = emailInput.trim();
+    if (trimmed && !EMAIL_RE.test(trimmed)) {
+      Alert.alert('Invalid Email', 'Please enter a valid email address.');
+      return;
+    }
+    setUserEmail(trimmed);
   };
 
   const handleResetData = () => {

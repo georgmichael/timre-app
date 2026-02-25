@@ -16,7 +16,7 @@ import {
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
 import { ThemeColors } from '../constants/colors';
-import { MAX_STREAK_SAVERS } from '../constants/limits';
+import { MAX_STREAK_SAVERS, MAX_INTENTION_LENGTH, MAX_TIME_MINUTES } from '../constants/limits';
 import CircularProgress from '../components/CircularProgress';
 import { AppGoal } from '../types';
 import { HomeScreenProps } from '../types/navigation';
@@ -53,8 +53,9 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
   }, []);
 
   const addIntention = () => {
-    if (!intentionText.trim()) return;
-    addDailyIntention(intentionText);
+    const trimmed = intentionText.trim().slice(0, MAX_INTENTION_LENGTH);
+    if (!trimmed) return;
+    addDailyIntention(trimmed);
     setIntentionText('');
     setShowAddModal(false);
   };
@@ -78,7 +79,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
 
   const saveTime = () => {
     if (selectedGoal) {
-      const minutes = parseInt(timeInput, 10) || 0;
+      const minutes = Math.min(parseInt(timeInput, 10) || 0, MAX_TIME_MINUTES);
       updateRecurringGoal(selectedGoal.id, {
         used: minutes,
         completed: minutes <= selectedGoal.limit,
