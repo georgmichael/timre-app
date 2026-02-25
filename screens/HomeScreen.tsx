@@ -32,7 +32,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
     getTimeSaved,
     isEveningReviewTime,
     isNewDay,
-    dayStarted,
+    startNewDay,
   } = useApp();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -45,8 +45,10 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
   const [timeInput, setTimeInput] = useState('');
 
   useEffect(() => {
-    if (isNewDay() && !dayStarted) {
-      navigation.navigate('MorningCheckIn');
+    if (isNewDay()) {
+      startNewDay().then(() => {
+        navigation.navigate('MorningCheckIn');
+      });
     }
   }, []);
 
@@ -244,58 +246,57 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         transparent={true}
         onRequestClose={closeModal}
       >
-        <TouchableWithoutFeedback onPress={() => { Keyboard.dismiss(); setTimeout(closeModal, 100); }}>
-          <View style={styles.modalOverlay}>
-            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-              <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={styles.modalContent}
-              >
-                <View style={styles.swipeIndicator} />
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <TouchableWithoutFeedback onPress={closeModal}>
+            <View style={styles.modalBackdrop} />
+          </TouchableWithoutFeedback>
+          <View style={styles.modalContent}>
+            <View style={styles.swipeIndicator} />
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={closeModal}
+            >
+              <Text style={styles.closeButtonText}>✕</Text>
+            </TouchableOpacity>
+
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <Text style={styles.modalTitle}>Add Daily Intention</Text>
+              <Text style={styles.modalSubtitle}>
+                What's one thing you want to accomplish today?
+              </Text>
+
+              <TextInput
+                style={styles.input}
+                value={intentionText}
+                onChangeText={setIntentionText}
+                placeholder="e.g., Call mom, Read 30 pages, Cook a healthy dinner"
+                placeholderTextColor={theme.textTertiary}
+                returnKeyType="done"
+                blurOnSubmit={true}
+                multiline
+                numberOfLines={3}
+              />
+
+              <View style={styles.modalButtons}>
                 <TouchableOpacity
-                  style={styles.closeButton}
-                  onPress={() => { Keyboard.dismiss(); setTimeout(closeModal, 100); }}
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={closeModal}
                 >
-                  <Text style={styles.closeButtonText}>✕</Text>
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
                 </TouchableOpacity>
-
-                <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                  <Text style={styles.modalTitle}>Add Daily Intention</Text>
-                  <Text style={styles.modalSubtitle}>
-                    What's one thing you want to accomplish today?
-                  </Text>
-
-                  <TextInput
-                    style={styles.input}
-                    value={intentionText}
-                    onChangeText={setIntentionText}
-                    placeholder="e.g., Call mom, Read 30 pages, Cook a healthy dinner"
-                    placeholderTextColor={theme.textTertiary}
-                    returnKeyType="done"
-                    blurOnSubmit={true}
-                    multiline
-                    numberOfLines={3}
-                  />
-
-                  <View style={styles.modalButtons}>
-                    <TouchableOpacity
-                      style={[styles.modalButton, styles.cancelButton]}
-                      onPress={() => { Keyboard.dismiss(); setTimeout(closeModal, 150); }}
-                    >
-                      <Text style={styles.cancelButtonText}>Cancel</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.modalButton, styles.saveButton]}
-                      onPress={() => { Keyboard.dismiss(); setTimeout(addIntention, 150); }}
-                    >
-                      <Text style={styles.saveButtonText}>Add Intention</Text>
-                    </TouchableOpacity>
-                  </View>
-                </ScrollView>
-              </KeyboardAvoidingView>
-            </TouchableWithoutFeedback>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.saveButton]}
+                  onPress={addIntention}
+                >
+                  <Text style={styles.saveButtonText}>Add Intention</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
           </View>
-        </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Log Time Modal */}
@@ -305,76 +306,75 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         transparent={true}
         onRequestClose={closeTimeModal}
       >
-        <TouchableWithoutFeedback onPress={() => { Keyboard.dismiss(); setTimeout(closeTimeModal, 100); }}>
-          <View style={styles.modalOverlay}>
-            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-              <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={styles.modalContent}
-              >
-                <View style={styles.swipeIndicator} />
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <TouchableWithoutFeedback onPress={closeTimeModal}>
+            <View style={styles.modalBackdrop} />
+          </TouchableWithoutFeedback>
+          <View style={styles.modalContent}>
+            <View style={styles.swipeIndicator} />
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={closeTimeModal}
+            >
+              <Text style={styles.closeButtonText}>✕</Text>
+            </TouchableOpacity>
+
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <Text style={styles.modalTitle}>Log {selectedGoal?.name} Time</Text>
+              <Text style={styles.modalSubtitle}>
+                How many minutes have you used today?
+              </Text>
+
+              <View style={styles.timeInputContainer}>
+                <TextInput
+                  style={styles.timeInputField}
+                  value={timeInput}
+                  onChangeText={setTimeInput}
+                  keyboardType="number-pad"
+                  placeholder="0"
+                  placeholderTextColor={theme.textTertiary}
+                />
+                <Text style={styles.timeUnit}>minutes</Text>
+              </View>
+
+              <View style={styles.quickAddRow}>
+                {[5, 10, 15, 30].map((mins) => (
+                  <TouchableOpacity
+                    key={mins}
+                    style={styles.quickAddButton}
+                    onPress={() => addTime(mins)}
+                  >
+                    <Text style={styles.quickAddText}>+{mins}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {selectedGoal && (
+                <Text style={styles.limitReminder}>
+                  Daily limit: {selectedGoal.limit} minutes
+                </Text>
+              )}
+
+              <View style={styles.modalButtons}>
                 <TouchableOpacity
-                  style={styles.closeButton}
-                  onPress={() => { Keyboard.dismiss(); setTimeout(closeTimeModal, 100); }}
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={closeTimeModal}
                 >
-                  <Text style={styles.closeButtonText}>✕</Text>
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
                 </TouchableOpacity>
-
-                <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                  <Text style={styles.modalTitle}>Log {selectedGoal?.name} Time</Text>
-                  <Text style={styles.modalSubtitle}>
-                    How many minutes have you used today?
-                  </Text>
-
-                  <View style={styles.timeInputContainer}>
-                    <TextInput
-                      style={styles.timeInputField}
-                      value={timeInput}
-                      onChangeText={setTimeInput}
-                      keyboardType="number-pad"
-                      placeholder="0"
-                      placeholderTextColor={theme.textTertiary}
-                    />
-                    <Text style={styles.timeUnit}>minutes</Text>
-                  </View>
-
-                  <View style={styles.quickAddRow}>
-                    {[5, 10, 15, 30].map((mins) => (
-                      <TouchableOpacity
-                        key={mins}
-                        style={styles.quickAddButton}
-                        onPress={() => addTime(mins)}
-                      >
-                        <Text style={styles.quickAddText}>+{mins}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-
-                  {selectedGoal && (
-                    <Text style={styles.limitReminder}>
-                      Daily limit: {selectedGoal.limit} minutes
-                    </Text>
-                  )}
-
-                  <View style={styles.modalButtons}>
-                    <TouchableOpacity
-                      style={[styles.modalButton, styles.cancelButton]}
-                      onPress={() => { Keyboard.dismiss(); setTimeout(closeTimeModal, 150); }}
-                    >
-                      <Text style={styles.cancelButtonText}>Cancel</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.modalButton, styles.saveButton]}
-                      onPress={() => { Keyboard.dismiss(); setTimeout(saveTime, 150); }}
-                    >
-                      <Text style={styles.saveButtonText}>Save</Text>
-                    </TouchableOpacity>
-                  </View>
-                </ScrollView>
-              </KeyboardAvoidingView>
-            </TouchableWithoutFeedback>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.saveButton]}
+                  onPress={saveTime}
+                >
+                  <Text style={styles.saveButtonText}>Save</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
           </View>
-        </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -478,13 +478,14 @@ const createStyles = (theme: ThemeColors) =>
     },
     primaryButtonText: { fontSize: 18, fontWeight: '600', color: '#ffffff' },
     modalOverlay: { flex: 1, backgroundColor: theme.modalOverlay, justifyContent: 'flex-end' },
+    modalBackdrop: { flex: 1 },
     modalContent: {
       backgroundColor: theme.surface,
-      borderTopLeftRadius: 24,
-      borderTopRightRadius: 24,
+      borderRadius: 24,
       padding: 24,
       paddingBottom: 40,
-      maxHeight: '80%',
+      marginHorizontal: 12,
+      marginBottom: 12,
     },
     swipeIndicator: {
       width: 40,

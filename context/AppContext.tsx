@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RecurringGoal, Intention, AppGoal, CompleteDayResult } from '../types';
 import { STORAGE_KEYS } from '../constants/storage';
@@ -10,6 +10,53 @@ const DEFAULT_RECURRING_GOALS: RecurringGoal[] = [
   { id: 2, type: 'app', name: 'TikTok', limit: 45, used: 0, color: '#00f2ea', completed: false },
   { id: 3, type: 'habit', name: 'Meditate 10 min', completed: false },
 ];
+
+// Returns the "effective today" date string, accounting for the 3am day boundary
+const getEffectiveToday = (): string => {
+  const now = new Date();
+  if (now.getHours() < DAY_BOUNDARY_HOUR) {
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    return yesterday.toDateString();
+  }
+  return now.toDateString();
+};
+
+// Derives the current streak by counting consecutive days back from today in the history set
+const calculateCurrentStreak = (history: string[]): number => {
+  if (history.length === 0) return 0;
+  const historySet = new Set(history);
+  let streak = 0;
+  const cursor = new Date();
+  if (cursor.getHours() < DAY_BOUNDARY_HOUR) {
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  while (historySet.has(cursor.toDateString())) {
+    streak++;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+};
+
+// Finds the longest consecutive run across the entire history
+const calculateLongestStreak = (history: string[]): number => {
+  if (history.length === 0) return 0;
+  const sorted = [...history]
+    .map(d => new Date(d).getTime())
+    .sort((a, b) => a - b);
+  let longest = 1;
+  let current = 1;
+  const DAY_MS = 86400000;
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i] - sorted[i - 1] === DAY_MS) {
+      current++;
+      if (current > longest) longest = current;
+    } else if (sorted[i] !== sorted[i - 1]) {
+      current = 1;
+    }
+  }
+  return longest;
+};
 
 interface AppContextValue {
   isLoading: boolean;
@@ -45,9 +92,7 @@ const AppContext = createContext<AppContextValue | undefined>(undefined);
 
 export const useApp = (): AppContextValue => {
   const context = useContext(AppContext);
-  if (!context) {
-    throw new Error('useApp must be used within AppProvider');
-  }
+  if (!context) throw new Error('useApp must be used within AppProvider');
   return context;
 };
 
@@ -58,14 +103,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [userEmail, setUserEmailState] = useState('');
   const [use24HourFormat, setUse24HourFormatState] = useState(false);
 
-  const [currentStreak, setCurrentStreakState] = useState(0);
-  const [longestStreak, setLongestStreakState] = useState(0);
+  // Streak state — currentStreak is derived from completionHistory
+  const [completionHistory, setCompletionHistoryState] = useState<string[]>([]);
   const [streakSavers, setStreakSaversState] = useState(0);
   const [lastOpenedDate, setLastOpenedDateState] = useState(new Date().toDateString());
   const [dayStarted, setDayStartedState] = useState(false);
 
   const [recurringGoals, setRecurringGoalsState] = useState<RecurringGoal[]>(DEFAULT_RECURRING_GOALS);
   const [dailyIntentions, setDailyIntentionsState] = useState<Intention[]>([]);
+
+  // Derived streak values — recalculate whenever history changes
+  const currentStreak = useMemo(() => calculateCurrentStreak(completionHistory), [completionHistory]);
+  const longestStreak = useMemo(() => calculateLongestStreak(completionHistory), [completionHistory]);
 
   useEffect(() => {
     loadData();
@@ -76,37 +125,55 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const [
         savedBedtime,
         savedEmail,
-        savedCurrentStreak,
-        savedLongestStreak,
         savedStreakSavers,
         savedLastOpenedDate,
         savedDayStarted,
         savedRecurringGoals,
         savedDailyIntentions,
         savedUse24HourFormat,
+        savedCompletionHistory,
+        // Legacy — migrate old manually-stored streak if history doesn't exist yet
+        savedLegacyStreak,
       ] = await Promise.all([
         AsyncStorage.getItem(STORAGE_KEYS.BEDTIME),
         AsyncStorage.getItem(STORAGE_KEYS.USER_EMAIL),
-        AsyncStorage.getItem(STORAGE_KEYS.CURRENT_STREAK),
-        AsyncStorage.getItem(STORAGE_KEYS.LONGEST_STREAK),
         AsyncStorage.getItem(STORAGE_KEYS.STREAK_SAVERS),
         AsyncStorage.getItem(STORAGE_KEYS.LAST_OPENED_DATE),
         AsyncStorage.getItem(STORAGE_KEYS.DAY_STARTED),
         AsyncStorage.getItem(STORAGE_KEYS.RECURRING_GOALS),
         AsyncStorage.getItem(STORAGE_KEYS.DAILY_INTENTIONS),
         AsyncStorage.getItem(STORAGE_KEYS.USE_24_HOUR_FORMAT),
+        AsyncStorage.getItem(STORAGE_KEYS.COMPLETION_HISTORY),
+        AsyncStorage.getItem(STORAGE_KEYS.CURRENT_STREAK),
       ]);
 
       if (savedBedtime) setBedtimeState(savedBedtime);
       if (savedEmail) setUserEmailState(savedEmail);
-      if (savedCurrentStreak) setCurrentStreakState(parseInt(savedCurrentStreak, 10));
-      if (savedLongestStreak) setLongestStreakState(parseInt(savedLongestStreak, 10));
       if (savedStreakSavers) setStreakSaversState(parseInt(savedStreakSavers, 10));
       if (savedLastOpenedDate) setLastOpenedDateState(savedLastOpenedDate);
       if (savedDayStarted) setDayStartedState(savedDayStarted === 'true');
       if (savedRecurringGoals) setRecurringGoalsState(JSON.parse(savedRecurringGoals));
       if (savedDailyIntentions) setDailyIntentionsState(JSON.parse(savedDailyIntentions));
       if (savedUse24HourFormat !== null) setUse24HourFormatState(savedUse24HourFormat === 'true');
+
+      if (savedCompletionHistory) {
+        setCompletionHistoryState(JSON.parse(savedCompletionHistory));
+      } else if (savedLegacyStreak) {
+        // Migration: synthesize history from old manual streak counter
+        const legacyStreak = parseInt(savedLegacyStreak, 10);
+        if (legacyStreak > 0) {
+          const synthetic: string[] = [];
+          const cursor = new Date();
+          if (cursor.getHours() < DAY_BOUNDARY_HOUR) cursor.setDate(cursor.getDate() - 1);
+          for (let i = 0; i < legacyStreak; i++) {
+            const d = new Date(cursor);
+            d.setDate(d.getDate() - i);
+            synthetic.push(d.toDateString());
+          }
+          setCompletionHistoryState(synthetic);
+          await AsyncStorage.setItem(STORAGE_KEYS.COMPLETION_HISTORY, JSON.stringify(synthetic));
+        }
+      }
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
@@ -127,16 +194,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const setUse24HourFormat = useCallback(async (value: boolean) => {
     setUse24HourFormatState(value);
     await AsyncStorage.setItem(STORAGE_KEYS.USE_24_HOUR_FORMAT, value.toString());
-  }, []);
-
-  const setCurrentStreak = useCallback(async (value: number) => {
-    setCurrentStreakState(value);
-    await AsyncStorage.setItem(STORAGE_KEYS.CURRENT_STREAK, value.toString());
-  }, []);
-
-  const setLongestStreak = useCallback(async (value: number) => {
-    setLongestStreakState(value);
-    await AsyncStorage.setItem(STORAGE_KEYS.LONGEST_STREAK, value.toString());
   }, []);
 
   const setStreakSavers = useCallback(async (value: number) => {
@@ -164,18 +221,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await AsyncStorage.setItem(STORAGE_KEYS.DAILY_INTENTIONS, JSON.stringify(intentions));
   }, []);
 
+  const setCompletionHistory = useCallback(async (history: string[]) => {
+    setCompletionHistoryState(history);
+    await AsyncStorage.setItem(STORAGE_KEYS.COMPLETION_HISTORY, JSON.stringify(history));
+  }, []);
+
   const isNewDay = useCallback(() => {
-    const now = new Date();
-    const today = now.toDateString();
-    const currentHour = now.getHours();
-
-    if (currentHour < DAY_BOUNDARY_HOUR) {
-      const yesterday = new Date(now);
-      yesterday.setDate(yesterday.getDate() - 1);
-      return lastOpenedDate !== yesterday.toDateString();
-    }
-
-    return lastOpenedDate !== today;
+    const effectiveToday = getEffectiveToday();
+    return lastOpenedDate !== effectiveToday;
   }, [lastOpenedDate]);
 
   const startNewDay = useCallback(async () => {
@@ -186,17 +239,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
     await setRecurringGoals(resetGoals);
     await setDailyIntentions([]);
-
-    const now = new Date();
-    const currentHour = now.getHours();
-    if (currentHour >= DAY_BOUNDARY_HOUR) {
-      await setLastOpenedDate(now.toDateString());
-    } else {
-      const yesterday = new Date(now);
-      yesterday.setDate(yesterday.getDate() - 1);
-      await setLastOpenedDate(yesterday.toDateString());
-    }
-
+    await setLastOpenedDate(getEffectiveToday());
     await setDayStarted(false);
   }, [recurringGoals, setRecurringGoals, setDailyIntentions, setLastOpenedDate, setDayStarted]);
 
@@ -221,25 +264,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [recurringGoals, setRecurringGoals]);
 
   const addDailyIntention = useCallback(async (text: string) => {
-    const newIntention: Intention = {
-      id: Date.now(),
-      text: text.trim(),
-      completed: false,
-    };
-    const newIntentions = [...dailyIntentions, newIntention];
-    await setDailyIntentions(newIntentions);
+    const newIntention: Intention = { id: Date.now(), text: text.trim(), completed: false };
+    await setDailyIntentions([...dailyIntentions, newIntention]);
   }, [dailyIntentions, setDailyIntentions]);
 
   const deleteDailyIntention = useCallback(async (id: number) => {
-    const newIntentions = dailyIntentions.filter(i => i.id !== id);
-    await setDailyIntentions(newIntentions);
+    await setDailyIntentions(dailyIntentions.filter(i => i.id !== id));
   }, [dailyIntentions, setDailyIntentions]);
 
   const toggleDailyIntention = useCallback(async (id: number) => {
-    const newIntentions = dailyIntentions.map(i =>
+    await setDailyIntentions(dailyIntentions.map(i =>
       i.id === id ? { ...i, completed: !i.completed } : i,
-    );
-    await setDailyIntentions(newIntentions);
+    ));
   }, [dailyIntentions, setDailyIntentions]);
 
   const calculateStreakSaversEarned = useCallback(() => {
@@ -257,20 +293,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await setStreakSavers(newSaverCount);
 
     if (allRecurringComplete) {
-      const newStreak = currentStreak + 1;
-      await setCurrentStreak(newStreak);
-      if (newStreak > longestStreak) {
-        await setLongestStreak(newStreak);
-      }
+      // Add today to history — streak auto-calculates from the consecutive run
+      const today = getEffectiveToday();
+      const newHistory = completionHistory.includes(today)
+        ? completionHistory
+        : [...completionHistory, today];
+      await setCompletionHistory(newHistory);
       return { success: true, message: 'streak_maintained', saversEarned, newSaverCount };
     } else if (useSaver && streakSavers > 0) {
-      await setStreakSavers(streakSavers - 1);
+      // Saver covers the day — add to history so the streak isn't broken
+      const today = getEffectiveToday();
+      const newHistory = completionHistory.includes(today)
+        ? completionHistory
+        : [...completionHistory, today];
+      await setCompletionHistory(newHistory);
+      await setStreakSavers(newSaverCount - saversEarned - 1); // consume one saver
       return { success: true, message: 'saver_used', saversEarned: 0, newSaverCount: streakSavers - 1 };
     } else {
-      await setCurrentStreak(0);
+      // Streak broken — today is absent from history, streak will auto-calculate to 0
       return { success: false, message: 'streak_broken', saversEarned: 0, newSaverCount };
     }
-  }, [recurringGoals, streakSavers, currentStreak, longestStreak, calculateStreakSaversEarned, setStreakSavers, setCurrentStreak, setLongestStreak]);
+  }, [recurringGoals, streakSavers, completionHistory, calculateStreakSaversEarned, setStreakSavers, setCompletionHistory]);
 
   const getTimeSaved = useCallback(() => {
     return recurringGoals
@@ -283,10 +326,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const [hours, minutes] = bedtime.split(':');
     const bedtimeDate = new Date();
     bedtimeDate.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0);
-
     const reviewTime = new Date(bedtimeDate);
     reviewTime.setHours(reviewTime.getHours() - 1);
-
     return now >= reviewTime;
   }, [bedtime]);
 
@@ -295,8 +336,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setBedtimeState(DEFAULT_BEDTIME);
     setUserEmailState('');
     setUse24HourFormatState(false);
-    setCurrentStreakState(0);
-    setLongestStreakState(0);
+    setCompletionHistoryState([]);
     setStreakSaversState(0);
     setLastOpenedDateState(new Date().toDateString());
     setDayStartedState(false);

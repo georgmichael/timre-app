@@ -9,6 +9,7 @@ export const STORAGE_KEYS = {
   RECURRING_GOALS: '@timre_recurringGoals',
   DAILY_INTENTIONS: '@timre_dailyIntentions',
   USE_24_HOUR_FORMAT: '@timre_use24HourFormat',
+  COMPLETION_HISTORY: '@timre_completionHistory',
 } as const;
 
 export const NOTIFICATION_KEYS = {

@@ -44,10 +44,11 @@ export default function EveningReviewScreen({ navigation }: EveningReviewScreenP
     const saversEarned = calculateStreakSaversEarned();
 
     if (allRecurringComplete) {
-      const result = completeDay(false);
+      completeDay(false);
+      const newSaverCount = Math.min(streakSavers + saversEarned, MAX_STREAK_SAVERS);
       Alert.alert(
         '🔥 Streak Day!',
-        `Amazing work! You hit all recurring goals and completed ${intentionsCompleted} intention${intentionsCompleted !== 1 ? 's' : ''}.\n\nYour ${currentStreak + 1}-day streak continues!${saversEarned > 0 ? `\n\n+${saversEarned} Streak Saver${saversEarned > 1 ? 's' : ''} earned! (${(result as any).newSaverCount}/${MAX_STREAK_SAVERS})` : ''}`,
+        `Amazing work! You hit all recurring goals and completed ${intentionsCompleted} intention${intentionsCompleted !== 1 ? 's' : ''}.\n\nYour ${currentStreak + 1}-day streak continues!${saversEarned > 0 ? `\n\n+${saversEarned} Streak Saver${saversEarned > 1 ? 's' : ''} earned! (${newSaverCount}/${MAX_STREAK_SAVERS})` : ''}`,
         [{ text: 'Finish Day', onPress: () => navigation.navigate('Home') }],
       );
     } else if (streakSavers > 0) {
