@@ -10,6 +10,7 @@ export const STORAGE_KEYS = {
   DAILY_INTENTIONS: '@timre_dailyIntentions',
   USE_24_HOUR_FORMAT: '@timre_use24HourFormat',
   COMPLETION_HISTORY: '@timre_completionHistory',
+  ONBOARDING_COMPLETED: '@timre_onboarding_completed',
 } as const;
 
 export const NOTIFICATION_KEYS = {

@@ -225,6 +225,18 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
 
         {/* Action Buttons */}
         <View style={styles.actionButtons}>
+          <TouchableOpacity
+            style={styles.focusTimerCard}
+            onPress={() => navigation.navigate('Pomodoro')}
+          >
+            <Text style={styles.focusTimerIcon}>⏱</Text>
+            <View style={styles.focusTimerInfo}>
+              <Text style={styles.focusTimerTitle}>Focus Timer</Text>
+              <Text style={styles.focusTimerSub}>Pomodoro technique</Text>
+            </View>
+            <Text style={styles.focusTimerChevron}>›</Text>
+          </TouchableOpacity>
+
           {showEveningReview && (
             <TouchableOpacity
               style={[styles.primaryButton, styles.glowButton]}
@@ -470,7 +482,20 @@ const createStyles = (theme: ThemeColors) =>
       borderStyle: 'dashed',
     },
     emptyText: { fontSize: 16, color: theme.textTertiary },
-    actionButtons: { paddingHorizontal: 24, paddingBottom: 16 },
+    actionButtons: { paddingHorizontal: 24, paddingBottom: 16, gap: 12 },
+    focusTimerCard: {
+      backgroundColor: theme.surface,
+      padding: 16,
+      borderRadius: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 14,
+    },
+    focusTimerIcon: { fontSize: 22, width: 32, textAlign: 'center' },
+    focusTimerInfo: { flex: 1 },
+    focusTimerTitle: { fontSize: 16, fontWeight: '600', color: theme.textPrimary },
+    focusTimerSub: { fontSize: 13, color: theme.textSecondary, marginTop: 2 },
+    focusTimerChevron: { fontSize: 22, color: theme.textTertiary },
     settingsLink: { alignItems: 'center', paddingVertical: 16, paddingBottom: 32 },
     settingsLinkText: { fontSize: 16, color: theme.textSecondary, fontWeight: '600' },
     primaryButton: { backgroundColor: theme.accent, padding: 16, borderRadius: 12, alignItems: 'center' },

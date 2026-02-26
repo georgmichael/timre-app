@@ -5,11 +5,7 @@ import { STORAGE_KEYS } from '../constants/storage';
 import { MAX_STREAK_SAVERS, DAY_BOUNDARY_HOUR } from '../constants/limits';
 import { DEFAULT_BEDTIME } from '../constants/defaults';
 
-const DEFAULT_RECURRING_GOALS: RecurringGoal[] = [
-  { id: 1, type: 'app', name: 'Instagram', limit: 30, used: 0, color: '#e4405f', completed: false },
-  { id: 2, type: 'app', name: 'TikTok', limit: 45, used: 0, color: '#00f2ea', completed: false },
-  { id: 3, type: 'habit', name: 'Meditate 10 min', completed: false },
-];
+const DEFAULT_RECURRING_GOALS: RecurringGoal[] = [];
 
 // Returns the "effective today" date string, accounting for the 3am day boundary
 const getEffectiveToday = (): string => {
@@ -60,6 +56,8 @@ const calculateLongestStreak = (history: string[]): number => {
 
 interface AppContextValue {
   isLoading: boolean;
+  hasOnboarded: boolean;
+  completeOnboarding: () => Promise<void>;
   bedtime: string;
   setBedtime: (value: string) => Promise<void>;
   userEmail: string;
@@ -98,6 +96,7 @@ export const useApp = (): AppContextValue => {
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
+  const [hasOnboarded, setHasOnboardedState] = useState(false);
 
   const [bedtime, setBedtimeState] = useState(DEFAULT_BEDTIME);
   const [userEmail, setUserEmailState] = useState('');
@@ -134,6 +133,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         savedCompletionHistory,
         // Legacy — migrate old manually-stored streak if history doesn't exist yet
         savedLegacyStreak,
+        savedOnboarding,
       ] = await Promise.all([
         AsyncStorage.getItem(STORAGE_KEYS.BEDTIME),
         AsyncStorage.getItem(STORAGE_KEYS.USER_EMAIL),
@@ -145,6 +145,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         AsyncStorage.getItem(STORAGE_KEYS.USE_24_HOUR_FORMAT),
         AsyncStorage.getItem(STORAGE_KEYS.COMPLETION_HISTORY),
         AsyncStorage.getItem(STORAGE_KEYS.CURRENT_STREAK),
+        AsyncStorage.getItem(STORAGE_KEYS.ONBOARDING_COMPLETED),
       ]);
 
       if (savedBedtime) setBedtimeState(savedBedtime);
@@ -155,6 +156,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (savedRecurringGoals) setRecurringGoalsState(JSON.parse(savedRecurringGoals));
       if (savedDailyIntentions) setDailyIntentionsState(JSON.parse(savedDailyIntentions));
       if (savedUse24HourFormat !== null) setUse24HourFormatState(savedUse24HourFormat === 'true');
+
+      if (savedOnboarding === 'true') setHasOnboardedState(true);
 
       if (savedCompletionHistory) {
         setCompletionHistoryState(JSON.parse(savedCompletionHistory));
@@ -331,6 +334,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return now >= reviewTime;
   }, [bedtime]);
 
+  const completeOnboarding = useCallback(async () => {
+    setHasOnboardedState(true);
+    await AsyncStorage.setItem(STORAGE_KEYS.ONBOARDING_COMPLETED, 'true');
+  }, []);
+
   const resetAllData = useCallback(async () => {
     await AsyncStorage.multiRemove(Object.values(STORAGE_KEYS));
     setBedtimeState(DEFAULT_BEDTIME);
@@ -342,10 +350,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setDayStartedState(false);
     setRecurringGoalsState(DEFAULT_RECURRING_GOALS);
     setDailyIntentionsState([]);
+    setHasOnboardedState(false);
   }, []);
 
   const value: AppContextValue = {
     isLoading,
+    hasOnboarded,
+    completeOnboarding,
     bedtime,
     setBedtime,
     userEmail,
