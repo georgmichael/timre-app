@@ -18,6 +18,7 @@ import { useTheme } from '../context/ThemeContext';
 import { ThemeColors } from '../constants/colors';
 import { MAX_STREAK_SAVERS, MAX_INTENTION_LENGTH, MAX_TIME_MINUTES } from '../constants/limits';
 import CircularProgress from '../components/CircularProgress';
+import AnimatedBackground from '../components/AnimatedBackground';
 import { AppGoal } from '../types';
 import { HomeScreenProps } from '../types/navigation';
 
@@ -97,7 +98,9 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
   const showEveningReview = isEveningReviewTime();
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.outerContainer}>
+      <AnimatedBackground theme={theme} />
+      <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView}>
         {/* Header with Streak */}
         <View style={styles.header}>
@@ -378,12 +381,14 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
+    </View>
   );
 }
 
 const createStyles = (theme: ThemeColors) =>
   StyleSheet.create({
-    container: { flex: 1, backgroundColor: theme.background },
+    outerContainer: { flex: 1, backgroundColor: theme.background },
+    container: { flex: 1, backgroundColor: 'transparent' },
     scrollView: { flex: 1 },
     header: {
       flexDirection: 'row',
